@@ -4,13 +4,13 @@
 
 ## Выявленые проблемы
 
-service.py смешивает DB, storage, HTTP и бизнес-логику;
-upload читает файл целиком в память;  
-worker дублирует DB setup;  
-service слой кидает HTTPException;  
-delete может конфликтовать с alerts;  
-Docker Postgres port выглядит подозрительно;
-Redis env name не совпадает с кодом.
+- `service.py` смешивает DB, storage, HTTP и бизнес-логику.
+- `upload` читает файл целиком в память.
+- `worker` дублирует DB setup.
+- Слой `service` кидает `HTTPException`.
+- `delete` может конфликтовать с `alerts`.
+- Порт Postgres в Docker выглядит подозрительно.
+- Имя переменной окружения Redis не совпадает с кодом.
 
 ## Что сделано
 

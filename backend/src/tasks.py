@@ -1,11 +1,10 @@
-import os
 from celery import Celery
 
+from src.config import CELERY_BROKER_URL
 from src.worker import processing
 from src.worker.loop import run_in_worker_loop
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://backend-redis:6379/0")
-celery_app = Celery("file_tasks", broker=REDIS_URL, backend=REDIS_URL)
+celery_app = Celery("file_tasks", broker=CELERY_BROKER_URL, backend=CELERY_BROKER_URL)
 
 
 @celery_app.task
