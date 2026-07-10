@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from src.models import Alert, StoredFile
@@ -5,6 +6,7 @@ from src.models import Alert, StoredFile
 
 SUSPICIOUS_EXTENSIONS = {".exe", ".bat", ".cmd", ".sh", ".js"}
 MAX_SAFE_FILE_SIZE = 10 * 1024 * 1024
+PDF_PAGE_PATTERN = re.compile(rb"/Type\s*/Page\b")
 
 
 def find_threats(original_name: str, size: int, mime_type: str) -> list[str]:
@@ -36,9 +38,13 @@ def extract_metadata(stored_path: Path, original_name: str, mime_type: str, size
         metadata["char_count"] = len(content)
     elif mime_type == "application/pdf":
         content = stored_path.read_bytes()
-        metadata["approx_page_count"] = max(content.count(b"/Type /Page"), 1)
+        metadata["approx_page_count"] = count_pdf_pages(content)
 
     return metadata
+
+
+def count_pdf_pages(content: bytes) -> int:
+    return max(len(PDF_PAGE_PATTERN.findall(content)), 1)
 
 
 def build_alert(file_item: StoredFile) -> Alert:

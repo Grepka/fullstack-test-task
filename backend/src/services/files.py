@@ -7,6 +7,7 @@ from fastapi import UploadFile
 from src.database import async_session_maker
 from src.exceptions import EmptyFileError, FileNotFound, StoredFileMissing
 from src.models import StoredFile
+from src.repositories import alerts as alert_repository
 from src.repositories import files as file_repository
 from src.storage import delete_stored_file, get_stored_path, save_upload_file
 
@@ -64,9 +65,11 @@ async def delete_file(file_id: str) -> None:
         file_item = await file_repository.get_file(session, file_id)
         if not file_item:
             raise FileNotFound()
-        delete_stored_file(file_item.stored_name)
+        stored_name = file_item.stored_name
+        await alert_repository.delete_alerts_by_file_id(session, file_id)
         await file_repository.delete_file(session, file_item)
         await session.commit()
+        delete_stored_file(stored_name)
 
 
 async def get_file_path(file_id: str) -> tuple[StoredFile, Path]:
