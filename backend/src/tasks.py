@@ -1,11 +1,10 @@
 import asyncio
 import os
-from pathlib import Path
 from celery import Celery
 from src.database import async_session_maker
-from src.models import Alert
 from src.repositories import alerts as alert_repository
 from src.repositories import files as file_repository
+from src.services.scanning import build_alert, extract_metadata, find_threats
 from src.storage import get_stored_path
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://backend-redis:6379/0")
@@ -30,18 +29,7 @@ async def _scan_file_for_threats(file_id: str) -> None:
             return
 
         file_item.processing_status = "processing"
-        reasons: list[str] = []
-        extension = Path(file_item.original_name).suffix.lower()
-
-        if extension in {".exe", ".bat", ".cmd", ".sh", ".js"}:
-            reasons.append(f"suspicious extension {extension}")
-
-        if file_item.size > 10 * 1024 * 1024:
-            reasons.append("file is larger than 10 MB")
-
-        if extension == ".pdf" and file_item.mime_type not in {"application/pdf", "application/octet-stream"}:
-            reasons.append("pdf extension does not match mime type")
-
+        reasons = find_threats(file_item.original_name, file_item.size, file_item.mime_type)
         file_item.scan_status = "suspicious" if reasons else "clean"
         file_item.scan_details = ", ".join(reasons) if reasons else "no threats found"
         file_item.requires_attention = bool(reasons)
@@ -65,21 +53,12 @@ async def _extract_file_metadata(file_id: str) -> None:
             send_file_alert.delay(file_id)
             return
 
-        metadata = {
-            "extension": Path(file_item.original_name).suffix.lower(),
-            "size_bytes": file_item.size,
-            "mime_type": file_item.mime_type,
-        }
-
-        if file_item.mime_type.startswith("text/"):
-            content = stored_path.read_text(encoding="utf-8", errors="ignore")
-            metadata["line_count"] = len(content.splitlines())
-            metadata["char_count"] = len(content)
-        elif file_item.mime_type == "application/pdf":
-            content = stored_path.read_bytes()
-            metadata["approx_page_count"] = max(content.count(b"/Type /Page"), 1)
-
-        file_item.metadata_json = metadata
+        file_item.metadata_json = extract_metadata(
+            stored_path,
+            file_item.original_name,
+            file_item.mime_type,
+            file_item.size,
+        )
         file_item.processing_status = "processed"
         await session.commit()
 
@@ -92,18 +71,7 @@ async def _send_file_alert(file_id: str) -> None:
         if not file_item:
             return
 
-        if file_item.processing_status == "failed":
-            alert = Alert(file_id=file_id, level="critical", message="File processing failed")
-        elif file_item.requires_attention:
-            alert = Alert(
-                file_id=file_id,
-                level="warning",
-                message=f"File requires attention: {file_item.scan_details}",
-            )
-        else:
-            alert = Alert(file_id=file_id, level="info", message="File processed successfully")
-
-        alert_repository.add_alert(session, alert)
+        alert_repository.add_alert(session, build_alert(file_item))
         await session.commit()
 
 
