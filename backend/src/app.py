@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.alerts import router as alerts_router
 from src.api.files import router as files_router
+from src.api.health import router as health_router
 from src.exceptions import DomainError, NotFoundError
 
 app = FastAPI()
@@ -37,3 +38,4 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
 
 app.include_router(files_router)
 app.include_router(alerts_router)
+app.include_router(health_router)
