@@ -4,14 +4,11 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
-from src.config import STORAGE_DIR
 from src.database import async_session_maker
 from src.exceptions import EmptyFileError, FileNotFound, StoredFileMissing
 from src.models import StoredFile
 from src.repositories import files as file_repository
-
-
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+from src.storage import delete_stored_file, get_stored_path, save_upload_file
 
 
 async def list_files() -> list[StoredFile]:
@@ -28,15 +25,12 @@ async def get_file(file_id: str) -> StoredFile:
 
 
 async def create_file(title: str, upload_file: UploadFile) -> StoredFile:
-    content = await upload_file.read()
-    if not content:
-        raise EmptyFileError()
-
     file_id = str(uuid4())
     suffix = Path(upload_file.filename or "").suffix
     stored_name = f"{file_id}{suffix}"
-    stored_path = STORAGE_DIR / stored_name
-    stored_path.write_bytes(content)
+    size = await save_upload_file(upload_file, stored_name)
+    if size == 0:
+        raise EmptyFileError()
 
     file_item = StoredFile(
         id=file_id,
@@ -44,7 +38,7 @@ async def create_file(title: str, upload_file: UploadFile) -> StoredFile:
         original_name=upload_file.filename or stored_name,
         stored_name=stored_name,
         mime_type=upload_file.content_type or mimetypes.guess_type(stored_name)[0] or "application/octet-stream",
-        size=len(content),
+        size=size,
         processing_status="uploaded",
     )
     async with async_session_maker() as session:
@@ -70,16 +64,14 @@ async def delete_file(file_id: str) -> None:
         file_item = await file_repository.get_file(session, file_id)
         if not file_item:
             raise FileNotFound()
-        stored_path = STORAGE_DIR / file_item.stored_name
-        if stored_path.exists():
-            stored_path.unlink()
+        delete_stored_file(file_item.stored_name)
         await file_repository.delete_file(session, file_item)
         await session.commit()
 
 
 async def get_file_path(file_id: str) -> tuple[StoredFile, Path]:
     file_item = await get_file(file_id)
-    stored_path = STORAGE_DIR / file_item.stored_name
+    stored_path = get_stored_path(file_item.stored_name)
     if not stored_path.exists():
         raise StoredFileMissing()
     return file_item, stored_path
