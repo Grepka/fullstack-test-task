@@ -21,3 +21,8 @@ class StoredFileMissing(NotFoundError):
 class EmptyFileError(DomainError):
     def __init__(self) -> None:
         super().__init__("File is empty")
+
+
+class EmptyTitleError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("Title is empty")

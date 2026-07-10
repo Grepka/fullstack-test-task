@@ -16,7 +16,7 @@ async def list_files_view():
 
 @router.post("/files", response_model=FileItem, status_code=201)
 async def create_file_view(
-    title: str = Form(...),
+    title: str = Form(..., min_length=1, max_length=255),
     file: UploadFile = File(...),
 ):
     file_item = await create_file(title=title, upload_file=file)

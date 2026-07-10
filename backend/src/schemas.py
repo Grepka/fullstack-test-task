@@ -1,6 +1,10 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
 
 
 class FileItem(BaseModel):
@@ -21,7 +25,7 @@ class FileItem(BaseModel):
 
 
 class FileUpdate(BaseModel):
-    title: str
+    title: Title
 
 
 class AlertItem(BaseModel):

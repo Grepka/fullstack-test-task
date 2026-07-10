@@ -5,11 +5,18 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from src.database import async_session_maker
-from src.exceptions import EmptyFileError, FileNotFound, StoredFileMissing
+from src.exceptions import EmptyFileError, EmptyTitleError, FileNotFound, StoredFileMissing
 from src.models import StoredFile
 from src.repositories import alerts as alert_repository
 from src.repositories import files as file_repository
 from src.storage import delete_stored_file, get_stored_path, save_upload_file
+
+
+def normalize_title(title: str) -> str:
+    title = title.strip()
+    if not title:
+        raise EmptyTitleError()
+    return title
 
 
 async def list_files() -> list[StoredFile]:
@@ -26,6 +33,7 @@ async def get_file(file_id: str) -> StoredFile:
 
 
 async def create_file(title: str, upload_file: UploadFile) -> StoredFile:
+    title = normalize_title(title)
     file_id = str(uuid4())
     suffix = Path(upload_file.filename or "").suffix
     stored_name = f"{file_id}{suffix}"
@@ -44,12 +52,18 @@ async def create_file(title: str, upload_file: UploadFile) -> StoredFile:
     )
     async with async_session_maker() as session:
         file_repository.add_file(session, file_item)
-        await session.commit()
+        try:
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            delete_stored_file(stored_name)
+            raise
         await session.refresh(file_item)
     return file_item
 
 
 async def update_file(file_id: str, title: str) -> StoredFile:
+    title = normalize_title(title)
     async with async_session_maker() as session:
         file_item = await file_repository.get_file(session, file_id)
         if not file_item:

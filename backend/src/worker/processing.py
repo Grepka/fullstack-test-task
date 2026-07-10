@@ -51,5 +51,5 @@ async def send_file_alert(file_id: str) -> None:
         if not file_item:
             return
 
-        alert_repository.add_alert(session, build_alert(file_item))
+        await alert_repository.add_alert_once(session, build_alert(file_item))
         await session.commit()
