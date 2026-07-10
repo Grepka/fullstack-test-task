@@ -2,10 +2,11 @@ import mimetypes
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 
 from src.config import STORAGE_DIR
 from src.database import async_session_maker
+from src.exceptions import EmptyFileError, FileNotFound, StoredFileMissing
 from src.models import StoredFile
 from src.repositories import files as file_repository
 
@@ -22,14 +23,14 @@ async def get_file(file_id: str) -> StoredFile:
     async with async_session_maker() as session:
         file_item = await file_repository.get_file(session, file_id)
         if not file_item:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+            raise FileNotFound()
         return file_item
 
 
 async def create_file(title: str, upload_file: UploadFile) -> StoredFile:
     content = await upload_file.read()
     if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File is empty")
+        raise EmptyFileError()
 
     file_id = str(uuid4())
     suffix = Path(upload_file.filename or "").suffix
@@ -57,7 +58,7 @@ async def update_file(file_id: str, title: str) -> StoredFile:
     async with async_session_maker() as session:
         file_item = await file_repository.get_file(session, file_id)
         if not file_item:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+            raise FileNotFound()
         file_item.title = title
         await session.commit()
         await session.refresh(file_item)
@@ -68,7 +69,7 @@ async def delete_file(file_id: str) -> None:
     async with async_session_maker() as session:
         file_item = await file_repository.get_file(session, file_id)
         if not file_item:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+            raise FileNotFound()
         stored_path = STORAGE_DIR / file_item.stored_name
         if stored_path.exists():
             stored_path.unlink()
@@ -80,5 +81,5 @@ async def get_file_path(file_id: str) -> tuple[StoredFile, Path]:
     file_item = await get_file(file_id)
     stored_path = STORAGE_DIR / file_item.stored_name
     if not stored_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stored file not found")
+        raise StoredFileMissing()
     return file_item, stored_path
