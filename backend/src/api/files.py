@@ -2,7 +2,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import FileResponse
 
 from src.schemas import FileItem, FileUpdate
-from src.service import create_file, delete_file, get_file, get_file_path, list_files, update_file
+from src.services.files import create_file, delete_file, get_file, get_file_path, list_files, update_file
 from src.tasks import scan_file_for_threats
 
 

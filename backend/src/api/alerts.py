@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from src.schemas import AlertItem
-from src.service import list_alerts
+from src.services.alerts import list_alerts
 
 
 router = APIRouter(tags=["alerts"])
