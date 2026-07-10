@@ -4,7 +4,9 @@ from pathlib import Path
 from celery import Celery
 from src.config import STORAGE_DIR
 from src.database import async_session_maker
-from src.models import Alert, StoredFile
+from src.models import Alert
+from src.repositories import alerts as alert_repository
+from src.repositories import files as file_repository
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://backend-redis:6379/0")
 _worker_loop: asyncio.AbstractEventLoop | None = None
@@ -23,7 +25,7 @@ celery_app = Celery("file_tasks", broker=REDIS_URL, backend=REDIS_URL)
 
 async def _scan_file_for_threats(file_id: str) -> None:
     async with async_session_maker() as session:
-        file_item = await session.get(StoredFile, file_id)
+        file_item = await file_repository.get_file(session, file_id)
         if not file_item:
             return
 
@@ -50,7 +52,7 @@ async def _scan_file_for_threats(file_id: str) -> None:
 
 async def _extract_file_metadata(file_id: str) -> None:
     async with async_session_maker() as session:
-        file_item = await session.get(StoredFile, file_id)
+        file_item = await file_repository.get_file(session, file_id)
         if not file_item:
             return
 
@@ -86,7 +88,7 @@ async def _extract_file_metadata(file_id: str) -> None:
 
 async def _send_file_alert(file_id: str) -> None:
     async with async_session_maker() as session:
-        file_item = await session.get(StoredFile, file_id)
+        file_item = await file_repository.get_file(session, file_id)
         if not file_item:
             return
 
@@ -101,7 +103,7 @@ async def _send_file_alert(file_id: str) -> None:
         else:
             alert = Alert(file_id=file_id, level="info", message="File processed successfully")
 
-        session.add(alert)
+        alert_repository.add_alert(session, alert)
         await session.commit()
 
 
