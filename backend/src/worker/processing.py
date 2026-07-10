@@ -34,13 +34,20 @@ async def extract_file_metadata(file_id: str) -> bool:
             await session.commit()
             return True
 
-        file_item.metadata_json = extract_metadata(
-            stored_path,
-            file_item.original_name,
-            file_item.mime_type,
-            file_item.size,
-        )
-        file_item.processing_status = "processed"
+        try:
+            file_item.metadata_json = extract_metadata(
+                stored_path,
+                file_item.original_name,
+                file_item.mime_type,
+                file_item.size,
+            )
+        except Exception as exc:
+            file_item.processing_status = "failed"
+            file_item.scan_status = file_item.scan_status or "failed"
+            file_item.scan_details = f"metadata extraction failed: {exc}"
+        else:
+            file_item.processing_status = "processed"
+
         await session.commit()
         return True
 
